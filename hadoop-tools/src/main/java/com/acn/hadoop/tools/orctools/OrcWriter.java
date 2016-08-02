@@ -13,6 +13,11 @@ import org.apache.commons.io.IOUtils;
 import org.apache.crunch.types.orc.OrcUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedBatchUtil;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
+import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile;
 import org.apache.hadoop.hive.ql.io.orc.OrcFile.WriterOptions;
 import org.apache.hadoop.hive.ql.io.orc.OrcStruct;
@@ -22,6 +27,7 @@ import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
 import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
 import org.apache.hadoop.io.Text;
+import org.apache.orc.TypeDescription;
 import org.apache.orc.mapred.OrcTimestamp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,21 +101,48 @@ public class OrcWriter {
 			
 			// Write the ORC file
 			
+			VectorizedRowBatch batch = writer.getSchema().createRowBatch();
+			
+			TimestampColumnVector ts = (TimestampColumnVector) batch.cols[0];
+			BytesColumnVector level = (BytesColumnVector) batch.cols[1];
+			BytesColumnVector source = (BytesColumnVector) batch.cols[2];
+			BytesColumnVector msg = (BytesColumnVector) batch.cols[3];
+			
 			String line = "";
 			
 			while((line = reader.readLine()) != null) {
 				
 				String[] tokens = line.split("\\|");
 				
-				// Create ORC line
-				OrcStruct orcLine = OrcUtils.createOrcStruct(
-						typeInfo,
-						new TimestampWritable(new OrcTimestamp(tokens[0])),
-						new Text(tokens[1]),
-						new Text(tokens[2]),
-						new Text(tokens[3]));
+//				// Create ORC line
+//				OrcStruct orcLine = OrcUtils.createOrcStruct(
+//						typeInfo,
+//						new TimestampWritable(new OrcTimestamp(tokens[0])),
+//						new Text(tokens[1]),
+//						new Text(tokens[2]),
+//						new Text(tokens[3]));
+//				
+//				writer.addRow(orcLine);
 				
-				writer.addRow(orcLine);
+				// Write ORC file in row batches
+				
+				int row = batch.size++;
+				
+				ts.set(row, new OrcTimestamp(tokens[0]));
+				level.setVal(row, tokens[1].getBytes(Charset.forName("UTF-8")));
+				source.setVal(row, tokens[2].getBytes(Charset.forName("UTF-8")));
+				msg.setVal(row, tokens[3].getBytes(Charset.forName("UTF-8")));
+				
+				// Check if batch is full, then write to ORC
+				if(batch.size == batch.getMaxSize()) {
+					writer.addRowBatch(batch);
+					batch.reset();
+				}
+			}
+			
+			// Write last batch
+			if(batch.size > 0) {
+				writer.addRowBatch(batch);
 			}
 			
 			writer.close();
