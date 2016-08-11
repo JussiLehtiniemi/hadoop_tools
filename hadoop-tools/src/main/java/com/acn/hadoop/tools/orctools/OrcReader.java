@@ -1,16 +1,21 @@
 package com.acn.hadoop.tools.orctools;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile.ReaderOptions;
-import org.apache.hadoop.hive.ql.io.orc.Reader;
-import org.apache.hadoop.hive.ql.io.orc.RecordReader;
+import org.apache.hadoop.io.Text;
+import org.apache.orc.OrcFile;
+import org.apache.orc.OrcFile.ReaderOptions;
+import org.apache.orc.Reader;
+import org.apache.orc.RecordReader;
+import org.apache.orc.mapred.OrcStruct;
+import org.apache.orc.mapred.OrcTimestamp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,7 +31,7 @@ public class OrcReader {
 		this.filePath = path;
 	}
 	
-	public void readRecords() throws IllegalArgumentException, IOException {
+	public List<OrcStruct> readRecords() throws IllegalArgumentException, IOException {
 		
 		if(this.filePath == null) {
 			LOG.error("File path is not set!");
@@ -35,6 +40,8 @@ public class OrcReader {
 		
 		Reader reader = null;
 		RecordReader rows = null;
+		
+		List<OrcStruct> output = new ArrayList<>();
 		
 		try {
 			
@@ -65,8 +72,18 @@ public class OrcReader {
 					buf.append(source.toString(r));
 					buf.append("|");
 					buf.append(msg.toString(r));
-					
+				
 					LOG.debug(buf.toString());
+					
+					// Build OrcStruct from the read data
+					
+					OrcStruct out = (OrcStruct) OrcStruct.createValue(reader.getSchema());
+					out.setFieldValue(0, new OrcTimestamp(tstamp.getTime(r)));
+					out.setFieldValue(1, new Text(level.toString(r)));
+					out.setFieldValue(2, new Text(source.toString(r)));
+					out.setFieldValue(3, new Text(msg.toString(r)));
+					
+					output.add(out);
 				}
 			}
 		}
@@ -78,5 +95,7 @@ public class OrcReader {
 		if(rows != null)
 			rows.close();
 		}
+		
+		return output;
 	}
 }

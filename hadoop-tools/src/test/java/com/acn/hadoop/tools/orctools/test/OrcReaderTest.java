@@ -3,6 +3,9 @@ package com.acn.hadoop.tools.orctools.test;
 import static org.junit.Assert.*;
 import static org.hamcrest.CoreMatchers.*;
 
+import java.util.List;
+
+import org.apache.orc.mapred.OrcStruct;
 import org.junit.Test;
 
 import com.acn.hadoop.tools.orctools.OrcReader;
@@ -18,7 +21,9 @@ public class OrcReaderTest {
 		
 		rdr.setFilePath(TESTFILE);
 		
-		rdr.readRecords();
+		List<OrcStruct> out = rdr.readRecords();
+		
+		assertThat(out.size(), is(1823));
 	}
 
 }

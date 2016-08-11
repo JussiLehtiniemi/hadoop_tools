@@ -12,14 +12,12 @@ import org.slf4j.LoggerFactory;
 
 import com.acn.hadoop.tools.orctools.OrcWriter;
 
-import junit.framework.TestCase;
-
 public class OrcWriterTest {
 	
 	private static final Logger LOG = LoggerFactory.getLogger(OrcWriterTest.class);
 	
-	private static final String TESTFILE = "test/plusEvBetting.log.preprocess";
-	private static final String OUTFILE = "test/out/test.orc";
+	private static final String TESTFILE = "test/plusEvBetting.log.Apr-2016.preprocess";
+	private static final String OUTFILE = "test/out/test_apr-2016.orc";
 
 	@Before
 	public void setup() {

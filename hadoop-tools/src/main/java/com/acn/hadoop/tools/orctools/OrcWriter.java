@@ -10,24 +10,15 @@ import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 
 import org.apache.commons.io.IOUtils;
-import org.apache.crunch.types.orc.OrcUtils;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hive.ql.exec.vector.BytesColumnVector;
 import org.apache.hadoop.hive.ql.exec.vector.TimestampColumnVector;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedBatchUtil;
 import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatch;
-import org.apache.hadoop.hive.ql.exec.vector.VectorizedRowBatchCtx;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile;
-import org.apache.hadoop.hive.ql.io.orc.OrcFile.WriterOptions;
-import org.apache.hadoop.hive.ql.io.orc.OrcStruct;
-import org.apache.hadoop.hive.ql.io.orc.Writer;
-import org.apache.hadoop.hive.serde2.io.TimestampWritable;
-import org.apache.hadoop.hive.serde2.objectinspector.ObjectInspector;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfo;
-import org.apache.hadoop.hive.serde2.typeinfo.TypeInfoUtils;
-import org.apache.hadoop.io.Text;
+import org.apache.orc.OrcFile;
+import org.apache.orc.OrcFile.WriterOptions;
 import org.apache.orc.TypeDescription;
+import org.apache.orc.Writer;
 import org.apache.orc.mapred.OrcTimestamp;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -85,8 +76,7 @@ public class OrcWriter {
 			String typeStr = "struct<eventTime:timestamp,level:string,source:string,message:string>";
 			
 			// Set up ORC writer
-			TypeInfo typeInfo = TypeInfoUtils.getTypeInfoFromTypeString(typeStr);
-			ObjectInspector inspector = OrcStruct.createObjectInspector(typeInfo);
+			TypeDescription schema = TypeDescription.fromString(typeStr);
 			
 			Configuration conf = new Configuration();
 			Path path = new Path(this.outputPath);
@@ -95,13 +85,13 @@ public class OrcWriter {
 					.blockSize(64 * MIB)
 					.stripeSize(64 * MIB)
 					.bufferSize((int) MIB)
-					.inspector(inspector);
+					.setSchema(schema);
 			
 			writer = OrcFile.createWriter(path, opts);
-			
+
 			// Write the ORC file
 			
-			VectorizedRowBatch batch = writer.getSchema().createRowBatch();
+			VectorizedRowBatch batch = schema.createRowBatch();
 			
 			TimestampColumnVector ts = (TimestampColumnVector) batch.cols[0];
 			BytesColumnVector level = (BytesColumnVector) batch.cols[1];
@@ -113,16 +103,6 @@ public class OrcWriter {
 			while((line = reader.readLine()) != null) {
 				
 				String[] tokens = line.split("\\|");
-				
-//				// Create ORC line
-//				OrcStruct orcLine = OrcUtils.createOrcStruct(
-//						typeInfo,
-//						new TimestampWritable(new OrcTimestamp(tokens[0])),
-//						new Text(tokens[1]),
-//						new Text(tokens[2]),
-//						new Text(tokens[3]));
-//				
-//				writer.addRow(orcLine);
 				
 				// Write ORC file in row batches
 				
